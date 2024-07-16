@@ -39,8 +39,7 @@ class DotChatBubble extends StatelessWidget {
                       p: const TextStyle(fontSize: 15),
                     ),
                   ),
-              const SizedBox(height: 20),
-
+                  const SizedBox(height: 20),
                   Text(
                     datetime,
                     style: const TextStyle(fontSize: 12),

@@ -8,15 +8,14 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({Key? key}) : super(key: key);
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  _ChatScreenState createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-
   final border = const OutlineInputBorder(
     borderRadius: BorderRadius.all(Radius.circular(20)),
     borderSide: BorderSide(color: Colors.deepOrange, width: 2),
@@ -24,6 +23,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Box<ChatMessageModel> chatHistory = Hive.box('chatHistory');
   List<ChatMessageModel> chatList = [];
+  bool isLoading = false;
 
   void _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
@@ -42,6 +42,10 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {});
 
     try {
+      setState(() {
+        isLoading = true;
+      });
+
       String? response = await gemini(prompt);
       final botMessage = ChatMessageModel(
         sender: 'bot',
@@ -51,7 +55,9 @@ class _ChatScreenState extends State<ChatScreen> {
       chatList.add(botMessage);
       chatHistory.add(botMessage);
 
-      setState(() {});
+      setState(() {
+        isLoading = false;
+      });
     } catch (e) {
       final errorMessage = ChatMessageModel(
         sender: 'bot',
@@ -60,14 +66,16 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       chatList.add(errorMessage);
 
-      setState(() {});
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    bool isEmpty = chatList.isEmpty;
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -84,92 +92,112 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
               ),
-              isEmpty
-                  ? SizedBox(
-                      height: size.height * 0.73,
-                      width: size.width - 25,
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'I am DOT',
-                            style: TextStyle(
-                              color: accentColor,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            'Your personal AI Assistant',
-                            style: TextStyle(
-                              color: accentColor,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold
-                            ),
-                          )
-                        ],
-                      ),
-                    )
-                  : SizedBox(
-                      height: size.height * 0.73,
-                      width: size.width - 25,
-                      child: ListView.builder(
-                        itemCount: chatList.length,
-                        itemBuilder: (context, index) {
-                          final chat = chatList[index];
-                          return chat.sender == 'user'
-                              ? Align(
-                                  alignment: Alignment.centerRight,
-                                  child: UserChatBubble(
-                                    prompt: chat.message,
-                                    datetime: chat.datetime,
-                                  ),
-                                )
-                              : Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: DotChatBubble(
-                                    response: chat.message,
-                                    datetime: chat.datetime,
-                                  ),
-                                );
-                        },
-                      ),
-                    ),
-              Row(
-                children: [
-                  Container(
-                    width: size.width - 60,
-                    padding: const EdgeInsets.only(left: 10),
-                    child: TextField(
-                      controller: _controller,
-                      decoration: InputDecoration(
-                        hintText: 'Enter your prompt',
-                        hintStyle: const TextStyle(fontSize: 18),
-                        contentPadding: const EdgeInsets.only(left: 10),
-                        border: border,
-                        focusedBorder: border,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _sendMessage,
-                    icon: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                      ),
-                      child: const Icon(Icons.send_rounded),
-                    ),
-                    color: buttonColor,
-                  ),
-                ],
-              ),
+              _buildChatWidget(size),
+              _buildInputBar(size),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildChatWidget(Size size) {
+    bool isEmpty = chatList.isEmpty;
+
+    return isEmpty
+        ? SizedBox(
+            height: size.height * 0.73,
+            width: size.width - 25,
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'I am DOT',
+                  style: TextStyle(
+                    color: accentColor,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Your personal AI Assistant',
+                  style: TextStyle(
+                    color: accentColor,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              ],
+            ),
+          )
+        : SizedBox(
+            height: size.height * 0.73,
+            width: size.width - 25,
+            child: ListView.builder(
+              itemCount: chatList.length,
+              itemBuilder: (context, index) {
+                final chat = chatList[index];
+                return chat.sender == 'user'
+                    ? Align(
+                        alignment: Alignment.centerRight,
+                        child: UserChatBubble(
+                          prompt: chat.message,
+                          datetime: chat.datetime,
+                        ),
+                      )
+                    : Align(
+                        alignment: Alignment.centerLeft,
+                        child: DotChatBubble(
+                          response: chat.message,
+                          datetime: chat.datetime,
+                        ),
+                      );
+              },
+            ),
+          );
+  }
+
+  Widget _buildInputBar(Size size) {
+    return Row(
+      children: [
+        Container(
+          width: size.width - 60,
+          padding: const EdgeInsets.only(left: 10),
+          child: TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              hintText: 'Enter your prompt',
+              hintStyle: const TextStyle(fontSize: 18),
+              contentPadding: const EdgeInsets.only(left: 10),
+              border: border,
+              focusedBorder: border,
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: _sendMessage,
+          icon: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+            child: isLoading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(buttonColor),
+                    ),
+                  )
+                : const Icon(Icons.send_rounded),
+          ),
+          color: buttonColor,
+        ),
+      ],
+    );
+  }
 }
+
